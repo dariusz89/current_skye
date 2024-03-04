@@ -1,0 +1,23 @@
+p {
+    background-color: aquamarine;
+}
+
+.line {
+    display: flex;
+    flex-direction: row;
+}
+.block {
+    width: 20px;
+    height: 20px;
+    margin: 0px;
+    background-color: #DDD;
+}
+.food {
+    background-color: coral;
+}
+.snake {
+    background-color: #888;
+}
+.snake-head {
+    background-color: #666;
+}

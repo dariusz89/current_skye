@@ -1,0 +1,4 @@
+python-socketio[client]
+websocket-client
+stable-baselines3[extra]
+gymnasium[box2d]
