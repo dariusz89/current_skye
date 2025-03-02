@@ -1,54 +1,31 @@
-"""Skye app"""
+"""Test.py"""
 import time
-from middlewares.clients import AppClientMiddleware
-from middlewares.agents import SnakeAgentMiddleware
+
+from my_processes import AppClient
+from middlewares import AppClientMiddleware
+
 from logging_utils import CustomLogger
 
-def main(server_url, namespace, transport):
-    """The main function"""
-    logger = CustomLogger("App", CustomLogger.DEBUG)
-    token = "skye"
-
+def main():
+    """main()"""
     # Initialize new process
-    app_client = AppClientMiddleware(server_url, namespace, token, transport)
-
+    appClient = AppClientMiddleware(AppClient)
     # Start process
-    app_client.start()
-
+    appClient.cmd_start()
     # ----------------------------------------
-    snake_agent = SnakeAgentMiddleware()
-    snake_agent.start()
-    data = {
-        "server_url": "ws://127.0.0.1:5000",
-        "namespace": "/snake",
-        "token": "snake",
-        "transport": "websocket"
-    }
-    snake_agent.cmd_run_client(data)
-    # ----------------------------------------
-    logger.info("Loop started for 60 seconds")
+    # Run child process
     duration_ms = 10000
     start_time = time.time() * 1000
     while (time.time() * 1000) - start_time < duration_ms:
         # Send command
-        app_client.cmd_emit_welcome()
-        snake_agent.cmd_message("Hello from App, snakeAgent")
-        time.sleep(1)  # Sleep for 1 second
-    logger.info("Loop finished after 60 seconds")
-
-    # Send command
-    app_client.cmd_disconnect()
-
+        appClient.cmd_message("Hello from AppClient")
+        # Run child process
+        appClient.cmd_run_process()
+        time.sleep(1)
     # ----------------------------------------
-    snake_agent.stop()
-    # ----------------------------------------
-
     # Stop process
-    app_client.stop()
+    appClient.cmd_stop()
 
+logger = CustomLogger("App", CustomLogger.INFO)
 if __name__ == '__main__':
-    # Websocket server connection information
-    SERVER_URL = "ws://127.0.0.1:5000"
-    NAMESPACE = "/skye"
-    TRANSPORT = "websocket"
-    main(SERVER_URL, NAMESPACE, TRANSPORT)
+    main()

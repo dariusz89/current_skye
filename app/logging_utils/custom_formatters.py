@@ -52,6 +52,7 @@ class FileFormatter(logging.Formatter):
             'msecs': int(record.msecs),
             'levelname': record.levelname,
             'name': record.name,
+            'processName': record.processName,
             'funcName': record.funcName,
             'lineno': record.lineno,
             'message': record.getMessage(),
@@ -67,6 +68,7 @@ class FileFormatter(logging.Formatter):
             "{asctime}.{msecs:03d} - "
             "{levelname} - "
             "{name} - "
+            "{processName} - "
             "{funcName}:{lineno} - "
             "{message}"
         ).format_map(log_parts)

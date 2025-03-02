@@ -1,107 +1,97 @@
-"""
-Module: base_process.py
-"""
+"""a"""
 import multiprocessing
 from logging_utils import CustomLogger
 from .inter_process_communication_manager import InterProcessCommunicationManager
 from .parent_process_communication_handler import ParentProcessCommunicationHandler
+from .child_process_communication_handler import ChildProcessCommunicationHandler
 
 class BaseProcess:
-    """
-    Represents a base class for creating child processes with communication capabilities.
-    """
+    """a"""
     def __init__(
             self,
             clazz,
             method_name,
             commands_interpreter,
-            args=(),
+            process_name,
+            args=None,
+            kwargs=None,
             start_method=multiprocessing.get_start_method()
         ):
-        """
-        Initializes an instance of the BaseProcess class.
-        """
+        """a"""
+        self.process_name = process_name
         self.logger = CustomLogger("multiprocessing_utils.BaseProcess", parent_logger_name="App")
         self._validate_class(clazz)
         self._validate_method(clazz, method_name)
+        self._validate_method(clazz, 'commands_interpreter_callback')
 
         self._clazz = clazz
         self._method_name = method_name
 
         self._ipc_manager = InterProcessCommunicationManager(timeout=10)
-        self._args = (self._ipc_manager,) + args
+        self.parent_communication_handler = ParentProcessCommunicationHandler(
+            self._ipc_manager,
+            commands_interpreter
+        )
+        self.child_communication_handler = None
+
+        self._args = args if args is not None else ()
+        self._kwargs = kwargs if kwargs is not None else {}
         self._start_method = start_method
         self._process = None
 
         self.pid = None
-        self.communication_handler = ParentProcessCommunicationHandler(
-            self._ipc_manager,
-            commands_interpreter
-        )
-
-        self.logger.debug("ParentProcess initialized")
 
     def _validate_class(self, clazz):
-        """
-        Validates if the provided class is a type or a callable object.
-        """
-        self.logger.debug("_validate_class")
+        """a"""
         if not (isinstance(clazz, type) or callable(clazz)):
-            self.logger.error("%s is not a type or a callable class", clazz)
             raise TypeError(f"{clazz} is not a type or a callable class")
 
     def _validate_method(self, clazz, method_name):
-        """
-        Validates if the provided class has a callable method with the specified name.
-        """
-        self.logger.debug("_validate_method")
+        """a"""
         if not hasattr(clazz, method_name) or not callable(getattr(clazz, method_name)):
-            self.logger.error(
-                "%s does not have a callable method named %s",
-                clazz.__name__,
-                method_name
-            )
             raise AttributeError(
                 f"{clazz.__name__} does not have a callable method named {method_name}"
             )
 
+    def _initialize_child_communication_handler(self, instance):
+        """Initialize the child communication handler with the instance's callback."""
+        commands_interpreter_callback = getattr(instance, 'commands_interpreter_callback')
+        self.child_communication_handler = ChildProcessCommunicationHandler(
+            self._ipc_manager,
+            commands_interpreter_callback
+        )
+        instance.set_communication_handler(self.child_communication_handler)
+
     def _call_method(self, instance):
-        """
-        Calls the specified method on the provided instance.
-        """
-        self.logger.debug("_call_method")
+        """a"""
         getattr(instance, self._method_name)()
 
     def _fork_process(self):
-        """
-        Prepares and returns a multiprocessing Process instance using the 'fork' start method.
-        """
-        self.logger.debug("_fork_process")
-        obj = self._clazz(*self._args)
-        return multiprocessing.Process(target=self._call_method, args=(obj,))
+        """a"""
+        instance = self._clazz(*self._args, **self._kwargs)
+        self._initialize_child_communication_handler(instance)
+
+        return multiprocessing.Process(
+            target=self._call_method,
+            name=self.process_name,
+            args=(instance,)
+        )
 
     def _spawn_process(self):
-        """
-        Prepares and returns a multiprocessing Process instance using the 'spawn' start method.
-        """
-        self.logger.debug("_spawn_process")
-        return multiprocessing.Process(target=self._prepare_spawn_process)
+        """a"""
+        return multiprocessing.Process(
+            target=self._prepare_spawn_process, 
+            name=self.process_name
+        )
 
     def _prepare_spawn_process(self):
-        """
-        Prepares the child process for 'spawn' start method 
-        by instantiating the class and calling the method.
-        """
-        self.logger.debug("_prepare_spawn_process")
-        obj = self._clazz(*self._args)
-        self._call_method(obj)
+        """a"""
+        instance = self._clazz(*self._args, **self._kwargs)
+        self._initialize_child_communication_handler(instance)
+        self._call_method(instance)
 
     def start_process(self):
-        """
-        Starts the child process and its command thread.
-        """
-        self.logger.debug("Start method: %s", self._start_method)
-
+        """a"""
         if self._start_method == 'spawn':
             self._process = self._spawn_process()
         elif self._start_method == 'fork':
@@ -111,16 +101,9 @@ class BaseProcess:
 
         self._process.start()
         self.pid = self._process.pid
-        self.logger.info("Child Process PID: %s", self.pid)
-
-        self.communication_handler.start_command_thread()
+        self.parent_communication_handler.start_command_thread()
 
     def stop_process(self):
-        """
-        Stops the child process by sending a stop command and joining the process.
-        """
-        self.communication_handler.send_command("stop_command_loop")
-        self.logger.debug("stop_command_loop")
-        self.communication_handler.stop_command_thread()
-        self.logger.debug("stop_process")
+        """a"""
+        self.parent_communication_handler.stop_command_thread()
         self._process.join()
